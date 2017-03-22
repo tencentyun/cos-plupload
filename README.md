@@ -1,6 +1,6 @@
 # cos-plupload
 
-plupload demo for 腾讯云 XML API
+plupload-2.3.1 demo for 腾讯云 XML API
 
 ## 使用步骤
 
@@ -13,7 +13,8 @@ plupload demo for 腾讯云 XML API
 7. 当前 demo 使用的是 COS XML API，注意 region 格式不要填写错误（华南:cn-south 华北:cn-north 华东:cn-east）
 8. 当前 demo 上传过程使用 PostObject 接口，目前（3月21日）仅支持华北园区支持此 API，其他园区会陆续支持，其他 XML API 请参考文档 https://www.qcloud.com/document/product/436/7751。
 
-其他：
+## 其他说明
+
 1. 如果需要支持 flash 上传，请防止一个 crossdomain.xml 文件，填写好允许跨域的配置，并设置文件共有读
 2. html4 上传方式下，文件上传成功时，plupload 会跨域报错，获取不到某个临时 iframe 里的内容，可以使用 plupload 的 debug 版本调试查看原因。
 
