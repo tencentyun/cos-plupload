@@ -2,12 +2,17 @@
 
 /**
  * php 签名样例
+ * @param string $method 请求类型 method
+ * @param string $pathname 文件名称
+ * @return string 签名字符串
  */
 
-function getAuthorization()
+function getAuthorization($method, $pathname)
 {
-    $method = 'POST';
-    $pathname = '/';
+    $method = strtoupper($method);
+    $method = $method ? $method : 'POST';
+    $pathname = $pathname ? $pathname : '/';
+    substr($pathname, 0, 1) != '/' && ($pathname = '/' . $pathname);
     $queryParams = array();
     $headers = array();
 
@@ -40,7 +45,7 @@ function getAuthorization()
 
     // 签名有效起止时间
     $now = time() - 1;
-    $expired = $now + 3600; // 签名过期时刻，3600秒后
+    $expired = $now + 600; // 签名过期时刻，600 秒后
 
     // 要用到的 Authorization 参数列表
     $qSignAlgorithm = 'sha1';
@@ -77,4 +82,6 @@ function getAuthorization()
     return $authorization;
 }
 
-echo getAuthorization();
+$method = isset($_GET['method']) ? $_GET['method'] : 'POST';
+$pathname = isset($_GET['pathname']) ? $_GET['pathname'] : '/';
+echo getAuthorization($method, $pathname);

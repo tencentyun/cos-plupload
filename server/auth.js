@@ -11,11 +11,15 @@ var cos = {
     // 获取个人 API 密钥 https://console.qcloud.com/capi
     sid: 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
     skey: 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
-    getAuthorization: function (callback) {
-        var method = 'POST';
-        var pathname = '/';
+    getAuthorization: function (method, pathname, callback) {
+        method = method.toUpperCase();
+        method = method ? method : 'POST';
+        pathname = pathname ? pathname : '/';
+        pathname.substr(0, 1) != '/' && (pathname = '/' + pathname);
         var queryParams = {};
         var headers = {};
+
+        console.log(method, pathname);
 
         // 工具方法
         var getObjectKeys = function (obj) {
@@ -43,7 +47,7 @@ var cos = {
 
         // 签名有效起止时间
         var now = parseInt(new Date().getTime() / 1000) - 1;
-        var expired = now + 3600; // 签名过期时刻，3600秒后
+        var expired = now + 600; // 签名过期时刻，600 秒后
 
         // 要用到的 Authorization 参数列表
         var qSignAlgorithm = 'sha1';
@@ -81,8 +85,22 @@ var cos = {
     }
 };
 
+var getParam = function (url, name) {
+    var query, params = {}, index = url.indexOf('?');
+    if (index >= 0) {
+        query = url.substr(index + 1).split('&');
+        query.forEach(function (v) {
+            var arr = v.split('=');
+            params[arr[0]] = arr[1];
+        });
+    }
+    return params[name];
+};
+
 http.createServer(function(req, res){
-    cos.getAuthorization(function (authorization) {
+    var method = getParam(req.url, 'method');
+    var pathname = getParam(req.url, 'pathname');
+    cos.getAuthorization(method, pathname, function (authorization) {
         res.writeHead(200, {
             'Content-Type': 'text/plain',
             'Access-Control-Allow-Methods': 'OPTIONS,GET,POST',

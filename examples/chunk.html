@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" dir="ltr">
+<head>
+    <meta http-equiv="content-type" content="text/html; charset=UTF-8"/>
+
+    <title>Plupload - Custom example</title>
+
+    <!-- production -->
+    <script type="text/javascript" src="../js/plupload.full.min.js"></script>
+
+    <!-- debug
+    <script type="text/javascript" src="../js/moxie.js"></script>
+    <script type="text/javascript" src="../js/plupload.dev.js"></script>
+    -->
+
+</head>
+<body style="font: 13px Verdana; background: #eee; color: #333">
+
+<h1>Custom example</h1>
+
+<p>Shows you how to use the core plupload API.</p>
+
+<div id="filelist">Your browser doesn't have Flash, Silverlight or HTML5 support.</div>
+<br />
+
+<div id="container">
+    <a id="pickfiles" href="javascript:;">[Select files]</a>
+</div>
+
+<br />
+<pre id="console"></pre>
+
+<script src="../cos/jquery-3.2.0.min.js"></script>
+<script type="text/javascript">
+    // Custom example logic
+
+    var appid = '1253435035';
+    var bucket = 'pl';
+    var region = 'cn-north'; // cn-north、cn-south、cn-east
+    var getCosUrl = function (path) {
+        path.charAt(0) == '/' && (path = path.substr(1));
+        return location.protocol + '//' + bucket + '-' + appid + '.' + region + '.myqcloud.com/' + path;
+    };
+    var getSignature = function (method, pathname, async, callback) {
+        method = method.toUpperCase();
+        if (async) {
+            $.ajax({url: '../server/auth.php', data: {method: method, pathname: pathname}, async: false, success: callback});
+        } else {
+            return $.ajax({url: '../server/auth.php', data: {method: method, pathname: pathname}, async: false}).responseText;
+        }
+    };
+    var initUploadAndGetUploadId = function (uploader, file, callback) {
+        file._uploadKey = file.name;
+        file._uploadNum = 0;
+        file._uploadChunkETags = {};
+        getSignature('POST', file._uploadKey, true, function (auth) {
+            $.ajax({
+                type: 'POST',
+                url: getCosUrl(file._uploadKey) + '?uploads',
+                beforeSend: function (xhr) {
+                    xhr.setRequestHeader('Authorization', auth);
+                },
+                success: function (r) {
+                    var uploadId = $(r).find('UploadId')[0].textContent;
+                    file._uploadId = uploadId;
+                    callback(uploadId, file);
+                }
+            });
+        });
+    };
+    var beforeChunkUpload = function (uploader, file, args, chunkBlob, offset) {
+        file._uploadNum++;
+        var auth = getSignature('PUT', file._uploadKey);
+        uploader.setOption({
+            url: getCosUrl(file._uploadKey) + '?partNumber=' + file._uploadNum + '&uploadId=' + file._uploadId,
+            http_method: 'PUT',
+            multipart: false,
+            headers: {
+                'Authorization': auth,
+                'Content-Length': chunkBlob.size
+            }
+        });
+    };
+    var startUpload = function (uploader, files) {
+        var len = files.length;
+        var count = len;
+        var i;
+        for (i = 0; i < len; i++) {
+            initUploadAndGetUploadId(uploader, files[i], function (uploadId, file) {
+                if (--count <= 0) {
+                    uploader.start();
+                }
+            });
+        }
+    };
+    var getEtagsBody = function (ETags) {
+        var i, xml = '<CompleteMultipartUpload>';
+        for (i in ETags) {
+            xml += '<Part><PartNumber>' + i + '</PartNumber><ETag>' + ETags[i] + '</ETag></Part>';
+        }
+        xml += '</CompleteMultipartUpload>';
+        return xml;
+    };
+    var fileUploaded = function (uploader, file) {
+        getSignature('POST', file._uploadKey, true, function (auth) {
+            $.ajax({
+                type: 'POST',
+                url: getCosUrl(file._uploadKey) + '?uploadId=' + file._uploadId,
+                data: getEtagsBody(file._uploadChunkETags),
+                beforeSend: function (xhr) {
+                    xhr.setRequestHeader('Authorization', auth);
+                    xhr.setRequestHeader('Content-Type', 'application/xml');
+                },
+                success: function (r) {
+                    console.log(file._uploadKey, 'upload done');
+                }
+            });
+        });
+    };
+
+    var uploader = new plupload.Uploader({
+        chunk_size: '1mb',
+        runtimes : 'html5',
+        browse_button : 'pickfiles', // you can pass an id...
+        container: document.getElementById('container'), // ... or DOM Element itself
+        filters : {
+            max_file_size : 5 * 1024 + 'mb',
+            mime_types: [
+                {title : "Upload Files", extensions : "*"}
+            ]
+        },
+
+        init: {
+            PostInit: function() {
+                document.getElementById('filelist').innerHTML = '';
+            },
+
+            FilesAdded: function(up, files) {
+                plupload.each(files, function(file) {
+                    document.getElementById('filelist').innerHTML += '<div id="' + file.id + '">' + file.name + ' (' + plupload.formatSize(file.size) + ') <b></b></div>';
+                });
+                startUpload(up, files);
+            },
+
+            BeforeChunkUpload: function(up, file, args, chunkBlob, offset) {
+                console.log("BeforeChunkUpload event activated");
+                beforeChunkUpload(up, file, args, chunkBlob, offset);
+            },
+
+            BeforeChunkUpload: function(up, file, args, chunkBlob, offset) {
+                console.log("BeforeChunkUpload event activated");
+                beforeChunkUpload(up, file, args, chunkBlob, offset);
+            },
+
+            ChunkUploaded: function(up, file, info) {
+                file._uploadChunkETags[file._uploadNum] = info.responseHeaders.split("\"")[1];
+            },
+
+            FileUploaded: function(up, file, info) {
+                fileUploaded(up, file);
+            },
+
+            UploadProgress: function(up, file) {
+                document.getElementById(file.id).getElementsByTagName('b')[0].innerHTML = '<span>' + file.percent + "%</span>";
+            },
+
+            Error: function(up, err) {
+                document.getElementById('console').appendChild(document.createTextNode("\nError #" + err.code + ": " + err.message));
+            }
+        }
+    });
+
+    uploader.init();
+
+</script>
+</body>
+</html>
