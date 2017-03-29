@@ -18,3 +18,8 @@ plupload-2.3.1 demo for 腾讯云 XML API
 1. 如果需要支持 flash 上传，请防止一个 crossdomain.xml 文件，填写好允许跨域的配置，并设置文件共有读
 2. html4 上传方式下，文件上传成功时，plupload 会跨域报错，获取不到某个临时 iframe 里的内容，可以使用 plupload 的 debug 版本调试查看原因。
 
+## 补充内容
+
+1. 添加了分片单并发上传 demo: examples/chunk.html
+1. 添加了分片多并发上传 demo: examples/chunk-multi.html
+
