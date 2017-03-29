@@ -105,7 +105,7 @@ http.createServer(function(req, res){
             'Content-Type': 'text/plain',
             'Access-Control-Allow-Methods': 'OPTIONS,GET,POST',
             'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Headers': '*',
+            'Access-Control-Allow-Headers': 'accept,content-type',
             'Access-Control-Max-Age': 60
         });
         res.write(authorization || '');
