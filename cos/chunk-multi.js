@@ -5,6 +5,7 @@
     var region = 'cn-north'; // 华南:cn-south 华北:cn-north 华东:cn-east
     var CHUNK_SIZE = 1 * 1024 * 1024; // 每个分片 1MB
     var THREAD_NUM = 5; // 5 个请求并发上传
+    var RETRY_TIMES = 3; // 分片错误重试 3 次
 
     var getCosUrl = function (path) {
         path.charAt(0) == '/' && (path = path.substr(1));
@@ -69,6 +70,13 @@
         });
     };
     var uploadSingleChunk = function (file, number, progress, callback) {
+        var removeXhr = function (xhr) {
+            for (var i = file._runningXhrs.length - 1; i >= 0; i--) {
+                if (xhr === file._runningXhrs[i]) {
+                    file._runningXhrs.splice(i, 1);
+                }
+            }
+        };
         var uploadChunk = function (url, blob, cb) {
             getSignature('PUT', file._uploadKey, true, function (auth) {
                 var xhr = new XMLHttpRequest();
@@ -92,8 +100,10 @@
                     });
                 };
                 xhr.onloadend = function () {
+                    removeXhr(xhr);
                     xhr = null;
                 };
+                file._runningXhrs.push(xhr);
                 xhr.send(blob);
             });
         };
@@ -106,7 +116,7 @@
         var tryUpload = function (times) {
             uploadChunk(url, blob, function (err, data) {
                 if (err) { // fail, retry
-                    if (times >= 3) {
+                    if (times >= RETRY_TIMES) {
                         callback(err, data);
                     } else {
                         tryUpload(times + 1);
@@ -152,20 +162,43 @@
                 uploadSingleChunk(file, number, function (e) {
                     chunk.loaded = e.loaded;
                     progress();
-                }, function (err, data) {
-                    chunk.state = err ? 'error' : 'done';
-                    chunk.ETag = data.responseHeaders.split('"')[1];
-                    cb();
+                }, function (error, data) {
+                    if (error) {
+                        chunk.state = 'error';
+                        cb(error);
+                    } else {
+                        chunk.state = 'done';
+                        chunk.ETag = data.responseHeaders.split('"')[1];
+                        cb();
+                    }
                 });
             }
         };
+        // 处理上传出错
+        file._runningXhrs = [];
+        file._uploadError = false;
+        window.file1 = file;
+        var errorReset = function (error) {
+            file._uploadError = error;
+            for (var i = file._runningXhrs.length - 1; i >= 0; i--) {
+                file._runningXhrs[i].abort();
+            }
+            callback && callback(error);
+        };
+        // 开始并发上传
         var unfinish = total;
         var nextThread = function () {
-            if (running >= THREAD_NUM || lastNumber >= total) return;
+            if (running >= THREAD_NUM || lastNumber >= total || file._uploadError) return;
             ++running;
             ++lastNumber;
-            uploadNextChunk(lastNumber, function () {
+            uploadNextChunk(lastNumber, function (error) {
                 --running;
+                if (file._uploadError) { // 已经出错了，直接退出
+                    return;
+                } else if (error) { // 第一次遇到分片，返回文件上传出错
+                    errorReset(error);
+                    return;
+                }
                 if (--unfinish <= 0) {
                     fileUploaded(uploader, file, callback);
                 } else {
