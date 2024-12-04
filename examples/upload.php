@@ -64,6 +64,18 @@ if (isset($_REQUEST["name"])) {
 	$fileName = uniqid("file_");
 }
 
+// 判断后缀，限制只允许白名单后缀
+$fileExt = end(explode(".", $fileName));
+if (!in_array($fileExt, array('jpg', 'png', 'gif', 'webp', 'avif', 'mp3', 'mp4'))) {
+	die('{"jsonrpc" : "2.0", "error" : {"code": 201, "message": "file file_extension not allow."}, "id" : "id"}');
+}
+echo $file_extension;
+
+// 去掉 / 字符，替换为 _，避免安全风险
+$fileName = str_replace('/', '_', $fileName);
+
+
+
 $filePath = $targetDir . DIRECTORY_SEPARATOR . $fileName;
 
 // Chunking might be enabled
